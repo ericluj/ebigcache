@@ -2,6 +2,10 @@ package ebigcache
 
 import "context"
 
+const (
+	minimumEntriesInShard = 10
+)
+
 type BigCache struct {
 	shards []*cacheShard
 	hash   Hasher
