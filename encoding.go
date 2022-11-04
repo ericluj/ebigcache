@@ -36,3 +36,7 @@ func readKeyFromEntry(data []byte) string {
 
 	return bytesToString(dst)
 }
+
+func resetKeyFromEntry(data []byte) {
+	binary.LittleEndian.PutUint64(data[timestampSizeInBytes:], 0)
+}

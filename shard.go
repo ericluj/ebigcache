@@ -1,6 +1,7 @@
 package ebigcache
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ericluj/ebigcache/queue"
@@ -31,16 +32,33 @@ func (s *cacheShard) set(key string, hashedKey uint64, entry []byte) error {
 
 	s.lock.Lock()
 
-	// 当map没有取到值的时候，返回的是类型的零值
+	// 如果hash已经有值，删掉（当map没有取到值的时候，返回的是类型的零值）
 	if previousIndex := s.hashmap[hashedKey]; previousIndex != 0 {
 		if previousEntry, err := s.entries.Get(int(previousIndex)); err == nil {
-
+			resetKeyFromEntry(previousEntry)
+			delete(s.hashmap, hashedKey)
 		}
 	}
 
-	return nil
+	w := wrapEntry(currentTimestamp, hashedKey, key, entry, &s.entryBuffer)
+
+	for {
+		if index, err := s.entries.Push(w); err == nil {
+			s.hashmap[hashedKey] = uint32(index)
+			s.lock.Unlock()
+			return nil
+		}
+		if s.removeOldestEntry(NoSpace) != nil {
+			s.lock.Unlock()
+			return fmt.Errorf("entry is bigger than max shard size")
+		}
+	}
 }
 
 func (s *cacheShard) get(key string, hashedKey uint64) ([]byte, error) {
 	return []byte("value"), nil
+}
+
+func (s *cacheShard) removeOldestEntry(reason RemoveReason) error {
+	return nil
 }
