@@ -32,6 +32,10 @@ type queueError struct {
 	message string
 }
 
+func (e *queueError) Error() string {
+	return e.message
+}
+
 // TODO:
 func getNeededSize(length int) int {
 	var header int
@@ -79,7 +83,13 @@ func (q *BytesQueue) Push(data []byte) (int, error) {
 	neededSize := getNeededSize(len(data))
 
 	if !q.canInsertAfterTail(neededSize) {
-
+		if q.canInsertBeforeHead(neededSize) {
+			q.tail = leftMarginIndex
+		} else if q.capacity+neededSize >= q.maxCapacity && q.maxCapacity > 0 {
+			return -1, &queueError{"Full queue. Maximum size limit reached."}
+		} else {
+			q.allocateAdditionalMemory(neededSize)
+		}
 	}
 
 	index := q.tail
@@ -87,6 +97,38 @@ func (q *BytesQueue) Push(data []byte) (int, error) {
 	q.push(data, neededSize)
 
 	return index, nil
+}
+
+func (q *BytesQueue) Get(index int) ([]byte, error) {
+	data, _, err := q.peek(index)
+	return data, err
+}
+
+// 从index位置读取出一个wrappedEntry
+func (q *BytesQueue) peek(index int) ([]byte, int, error) {
+	err := q.peekCheckErr(index)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	blockSize, n := binary.Uvarint(q.array[index:])
+	return q.array[index+n : index+int(blockSize)], int(blockSize), nil
+}
+
+func (q *BytesQueue) peekCheckErr(index int) error {
+
+	if q.count == 0 {
+		return errEmptyQueue
+	}
+
+	if index <= 0 {
+		return errInvalidIndex
+	}
+
+	if index >= len(q.array) {
+		return errIndexOutOfBounds
+	}
+	return nil
 }
 
 // canInsertAfterTail returns true if it's possible to insert an entry of size of need after the tail of the queue
@@ -115,6 +157,8 @@ func (q *BytesQueue) canInsertBeforeHead(need int) bool {
 	}
 	return q.head-q.tail == need || q.head-q.tail >= need+minimumHeaderSize
 }
+
+func (q *BytesQueue) allocateAdditionalMemory(minimum int) {}
 
 func (q *BytesQueue) push(data []byte, len int) {
 	headerEntrySize := binary.PutUvarint(q.headerBuffer, uint64(len))
