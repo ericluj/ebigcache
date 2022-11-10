@@ -9,7 +9,7 @@ const (
 	headersSizeInBytes   = timestampSizeInBytes + hashSizeInBytes + keySizeInBytes
 )
 
-// timestamp(8b) + hash(8b) + keyLen(2b) + key + entry
+// timestamp(8) + hash(8) + keyLen(2) + key + entry
 func wrapEntry(timestamp uint64, hash uint64, key string, entry []byte, buffer *[]byte) []byte {
 	keyLength := len(key)
 	blobLength := headersSizeInBytes + keyLength + len(entry)
@@ -28,6 +28,17 @@ func wrapEntry(timestamp uint64, hash uint64, key string, entry []byte, buffer *
 	return blob[:blobLength]
 }
 
+// 从wrappedEntry中读取时间戳
+func readTimestampFromEntry(data []byte) uint64 {
+	return binary.LittleEndian.Uint64(data)
+}
+
+// 从wrappedEntry中读取hashedKey
+func readHashFromEntry(data []byte) uint64 {
+	return binary.LittleEndian.Uint64(data[timestampSizeInBytes:])
+}
+
+// 从wrappedEntry中读取key
 func readKeyFromEntry(data []byte) string {
 	keyLength := binary.LittleEndian.Uint16(data[timestampSizeInBytes+hashSizeInBytes:])
 
@@ -37,8 +48,12 @@ func readKeyFromEntry(data []byte) string {
 	return bytesToString(dst)
 }
 
-func readEntry(data []byte) []byte {}
+// 从wrappedEntry中读取entry
+func readEntry(data []byte) []byte {
+	keyLength := binary.LittleEndian.Uint16(data[timestampSizeInBytes+hashSizeInBytes:])
 
-func resetKeyFromEntry(data []byte) {
-	binary.LittleEndian.PutUint64(data[timestampSizeInBytes:], 0)
+	dst := make([]byte, len(data)-int(headersSizeInBytes+keyLength))
+	copy(dst, data[headersSizeInBytes+keyLength:])
+
+	return dst
 }
