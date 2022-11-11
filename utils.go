@@ -1,5 +1,7 @@
 package ebigcache
 
+import "time"
+
 func max(a, b int) int {
 	if a > b {
 		return a
@@ -12,4 +14,8 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func now() int64 {
+	return time.Now().Unix()
 }
